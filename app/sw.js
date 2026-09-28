@@ -1,4 +1,4 @@
-const CACHE_NAME = "app-offline-v3";
+const CACHE_NAME = "app-offline-v4";
 const APP_SHELL = ["./icons/icon-192.png", "./icons/icon-512.png", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", event => {

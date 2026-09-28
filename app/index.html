@@ -930,24 +930,62 @@
 (function(){
   "use strict";
 
-  /* ---------------- Storage helpers ---------------- */
+  /* ---------------- Storage helpers ----------------
+     PWA/일반 브라우저에서는 localStorage를 사용합니다.
+     기존 환경에 window.storage가 있다면 그것도 사용할 수 있지만,
+     localStorage를 항상 백업 저장소로 사용해 앱을 껐다 켜도 기록이 유지됩니다.
+  ----------------------------------------------------- */
   async function storageGet(key, fallback){
+    // 1) 일반 모바일/PWA: localStorage
     try{
-      const res = await window.storage.get(key, false);
-      if(!res || res.value === undefined || res.value === null) return fallback;
-      return JSON.parse(res.value);
+      const raw = localStorage.getItem('daily3thanks:' + key);
+      if(raw !== null) return JSON.parse(raw);
     }catch(e){
-      return fallback;
+      console.warn('localStorage get failed', e);
     }
+
+    // 2) 기존 window.storage 환경이 있다면 마이그레이션용으로 읽기
+    try{
+      if(window.storage && typeof window.storage.get === 'function'){
+        const res = await window.storage.get(key, false);
+        if(res && res.value !== undefined && res.value !== null){
+          const value = JSON.parse(res.value);
+          // 다음 실행부터는 localStorage에서도 바로 읽도록 저장
+          try{
+            localStorage.setItem('daily3thanks:' + key, JSON.stringify(value));
+          }catch(_){}
+          return value;
+        }
+      }
+    }catch(e){
+      console.warn('legacy storage get failed', e);
+    }
+
+    return fallback;
   }
+
   async function storageSet(key, value){
+    const serialized = JSON.stringify(value);
+    let saved = false;
+
+    // 가장 중요한 영구 저장소: PWA에서도 유지되는 localStorage
     try{
-      await window.storage.set(key, JSON.stringify(value), false);
-      return true;
+      localStorage.setItem('daily3thanks:' + key, serialized);
+      saved = localStorage.getItem('daily3thanks:' + key) === serialized;
     }catch(e){
-      console.error('storage set failed', e);
-      return false;
+      console.error('localStorage set failed', e);
     }
+
+    // 기존 storage API가 있는 환경에서도 계속 저장
+    try{
+      if(window.storage && typeof window.storage.set === 'function'){
+        await window.storage.set(key, serialized, false);
+      }
+    }catch(e){
+      // 일반 PWA에서는 이 API가 없어도 정상입니다.
+    }
+
+    return saved;
   }
 
   /* ---------------- State ---------------- */
